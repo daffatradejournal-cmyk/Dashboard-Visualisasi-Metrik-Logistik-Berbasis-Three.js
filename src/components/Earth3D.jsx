@@ -1,23 +1,23 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { calculateSolarPosition, calculateMoonPosition, formatCoordinate } from '../utils/astronomy'
-import { Sun, Moon, Globe2, Compass, Play, Pause, RotateCcw, Sliders, Layers } from 'lucide-react'
+import { Sun, Moon, Globe2, Layers, RotateCcw, Sliders } from 'lucide-react'
 
-// Pembuat tekstur korona cahaya matahari procedural murni (tanpa asset eksternal)
+// Pembuat tekstur korona cahaya matahari procedural fotorealistik
 function createSunCoronaTexture() {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 256
+  canvas.width = 512
+  canvas.height = 512
   const ctx = canvas.getContext('2d')
-  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128)
+  const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256)
   gradient.addColorStop(0, 'rgba(255, 255, 245, 1.0)')
-  gradient.addColorStop(0.18, 'rgba(255, 215, 130, 0.75)')
-  gradient.addColorStop(0.45, 'rgba(255, 140, 45, 0.28)')
-  gradient.addColorStop(0.8, 'rgba(255, 90, 20, 0.08)')
+  gradient.addColorStop(0.12, 'rgba(255, 225, 140, 0.85)')
+  gradient.addColorStop(0.35, 'rgba(255, 150, 50, 0.35)')
+  gradient.addColorStop(0.7, 'rgba(255, 90, 20, 0.06)')
   gradient.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)')
   ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 256, 256)
+  ctx.fillRect(0, 0, 512, 512)
   const texture = new THREE.CanvasTexture(canvas)
   texture.needsUpdate = true
   return texture
@@ -26,21 +26,21 @@ function createSunCoronaTexture() {
 export default function Earth3D() {
   const mountRef = useRef(null)
 
-  // Status waktu dan mode (Waktu Nyata vs Simulasi Waktu)
+  // Status waktu
   const [isRealtime, setIsRealtime] = useState(true)
   const [simulationHour, setSimulationHour] = useState(null)
   const [currentDate, setCurrentDate] = useState(new Date())
-  
-  // Pengaturan visual
+
+  // Status visual
   const [showClouds, setShowClouds] = useState(true)
-  const [cameraFocus, setCameraFocus] = useState('earth') // 'earth' | 'moon' | 'sun'
+  const [cameraFocus, setCameraFocus] = useState('earth')
   const [isLoading, setIsLoading] = useState(true)
 
-  // Data astronomi terhitung
+  // Data astronomis
   const [solarData, setSolarData] = useState(() => calculateSolarPosition(new Date()))
   const [lunarData, setLunarData] = useState(() => calculateMoonPosition(new Date()))
 
-  // Mutable reference untuk loop animasi Three.js
+  // References loop animasi Three.js
   const engineRef = useRef({
     scene: null,
     camera: null,
@@ -50,6 +50,8 @@ export default function Earth3D() {
     earthMaterial: null,
     cloudsMesh: null,
     cloudsMaterial: null,
+    atmosphereMesh: null,
+    atmosphereMaterial: null,
     moonMesh: null,
     sunGroup: null,
     sunLight: null,
@@ -66,16 +68,14 @@ export default function Earth3D() {
         const now = new Date()
         setCurrentDate(now)
         engineRef.current.currentDate = now
-        const sData = calculateSolarPosition(now)
-        const lData = calculateMoonPosition(now)
-        setSolarData(sData)
-        setLunarData(lData)
+        setSolarData(calculateSolarPosition(now))
+        setLunarData(calculateMoonPosition(now))
       }
     }, 1000)
     return () => clearInterval(timer)
   }, [isRealtime])
 
-  // Sinkronisasi saat pengguna menggeser slider simulasi jam (0 - 24)
+  // Simulasi waktu via slider
   const handleHourSliderChange = (hourVal) => {
     setIsRealtime(false)
     setSimulationHour(hourVal)
@@ -85,26 +85,22 @@ export default function Earth3D() {
     simulatedDate.setHours(wholeHours, minutes, 0, 0)
     setCurrentDate(simulatedDate)
     engineRef.current.currentDate = simulatedDate
-    const sData = calculateSolarPosition(simulatedDate)
-    const lData = calculateMoonPosition(simulatedDate)
-    setSolarData(sData)
-    setLunarData(lData)
+    setSolarData(calculateSolarPosition(simulatedDate))
+    setLunarData(calculateMoonPosition(simulatedDate))
   }
 
-  // Kembali ke waktu nyata sekarang
+  // Reset ke waktu nyata
   const handleResetToRealtime = () => {
     setIsRealtime(true)
     setSimulationHour(null)
     const now = new Date()
     setCurrentDate(now)
     engineRef.current.currentDate = now
-    const sData = calculateSolarPosition(now)
-    const lData = calculateMoonPosition(now)
-    setSolarData(sData)
-    setLunarData(lData)
+    setSolarData(calculateSolarPosition(now))
+    setLunarData(calculateMoonPosition(now))
   }
 
-  // Penggantian fokus kamera ke Bumi / Bulan / Matahari
+  // Fokus kamera
   const setFocus = (target) => {
     setCameraFocus(target)
     const eng = engineRef.current
@@ -125,7 +121,7 @@ export default function Earth3D() {
     }
   }
 
-  // Toggle tampilan awan
+  // Toggle awan
   useEffect(() => {
     if (engineRef.current.cloudsMesh) {
       engineRef.current.cloudsMesh.visible = showClouds
@@ -133,7 +129,7 @@ export default function Earth3D() {
   }, [showClouds])
 
   // ==========================================
-  // INISIALISASI THREE.JS SCENE
+  // INISIALISASI THREE.JS SCENE UTAMA
   // ==========================================
   useEffect(() => {
     const mount = mountRef.current
@@ -142,9 +138,9 @@ export default function Earth3D() {
     const width = mount.clientWidth
     const height = mount.clientHeight
 
-    // 1. Scene & Latar Angkasa
+    // 1. Scene
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x010307)
+    scene.background = new THREE.Color(0x010204)
     engineRef.current.scene = scene
 
     // 2. Kamera
@@ -152,7 +148,7 @@ export default function Earth3D() {
     camera.position.set(0, 1.2, 5.5)
     engineRef.current.camera = camera
 
-    // 3. WebGL Renderer
+    // 3. Renderer dengan Anisotropic Filtering & ACES Tone Mapping
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance',
@@ -161,9 +157,11 @@ export default function Earth3D() {
     renderer.setSize(width, height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.18
+    renderer.toneMappingExposure = 1.05
     mount.appendChild(renderer.domElement)
     engineRef.current.renderer = renderer
+
+    const maxAnisotropy = renderer.capabilities.getMaxAnisotropy() || 8
 
     // 4. OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -175,26 +173,47 @@ export default function Earth3D() {
     controls.zoomSpeed = 1.0
     engineRef.current.controls = controls
 
-    // 5. Texture Loader
+    // 5. Texture Loader (Tekstur Ultra HD 4K)
     const textureLoader = new THREE.TextureLoader()
 
-    const dayTexture = textureLoader.load('/textures/earth_daymap.jpg', () => {
+    const configureTexture = (tex) => {
+      tex.anisotropy = maxAnisotropy
+      tex.generateMipmaps = true
+      tex.minFilter = THREE.LinearMipmapLinearFilter
+      tex.magFilter = THREE.LinearFilter
+      return tex
+    }
+
+    // 4K Blue Marble Earth Daymap
+    const dayTexture = configureTexture(textureLoader.load('/textures/2_no_clouds_4k.jpg', () => {
       setIsLoading(false)
-    })
+    }))
     dayTexture.colorSpace = THREE.SRGBColorSpace
 
-    const nightTexture = textureLoader.load('/textures/earth_lights.png')
+    // 4K Water / Ocean Mask
+    const waterTexture = configureTexture(textureLoader.load('/textures/water_4k.png'))
+
+    // 4K Elevation Bump Map
+    const bumpTexture = configureTexture(textureLoader.load('/textures/elev_bump_4k.jpg'))
+
+    // 2K Earth Night City Lights
+    const nightTexture = configureTexture(textureLoader.load('/textures/earth_lights.png'))
     nightTexture.colorSpace = THREE.SRGBColorSpace
 
-    const normalTexture = textureLoader.load('/textures/earth_normal.jpg')
-    const specularTexture = textureLoader.load('/textures/earth_specular.jpg')
-    const cloudsTexture = textureLoader.load('/textures/earth_clouds.png')
-    const moonTexture = textureLoader.load('/textures/moon.jpg')
+    // 4K Fair Clouds (32-bit ARGB dengan feathering halus anti-pixelated)
+    const cloudsTexture = configureTexture(textureLoader.load('/textures/fair_clouds_4k.png'))
+
+    // Moon Texture
+    const moonTexture = configureTexture(textureLoader.load('/textures/moon.jpg'))
     moonTexture.colorSpace = THREE.SRGBColorSpace
 
-    // 6. Model Bumi dengan Shader Custom Siang-Malam & Lampu Kota
     const earthRadius = 1.8
-    const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64)
+    const initialSolar = calculateSolarPosition(engineRef.current.currentDate)
+
+    // ==========================================
+    // 6. SHADER PERMUKAAN BUMI GOOGLE EARTH GRADE
+    // ==========================================
+    const earthGeometry = new THREE.SphereGeometry(earthRadius, 96, 96)
 
     const earthVertexShader = `
       varying vec2 vUv;
@@ -213,7 +232,7 @@ export default function Earth3D() {
     const earthFragmentShader = `
       uniform sampler2D dayMap;
       uniform sampler2D nightMap;
-      uniform sampler2D specularMap;
+      uniform sampler2D waterMap;
       uniform vec3 sunPosition;
 
       varying vec2 vUv;
@@ -224,44 +243,43 @@ export default function Earth3D() {
         vec3 normal = normalize(vNormal);
         vec3 sunDir = normalize(sunPosition - vWorldPosition);
         
-        // Sudut sinar matahari terhadap permukaan
+        // Sudut sinar matahari
         float sunDot = dot(normal, sunDir);
         
         vec4 dayColor = texture2D(dayMap, vUv);
         vec4 nightLights = texture2D(nightMap, vUv);
-        vec4 specValue = texture2D(specularMap, vUv);
+        vec4 waterMask = texture2D(waterMap, vUv);
         
-        // Zona twilight halus (garis batas fajar & senja)
-        float dayFactor = smoothstep(-0.08, 0.08, sunDot);
+        // Transisi senja/fajar halus (twilight terminator)
+        float dayFactor = smoothstep(-0.06, 0.08, sunDot);
         
-        // Sisi malam: Cahaya lampu kota + ambient angkasa indigo samar
-        vec3 nightAmbient = vec3(0.008, 0.012, 0.022);
-        vec3 cityLights = nightLights.rgb * (1.0 - dayFactor) * 2.8;
+        // Sisi malam: Lampu kota berpijar + ambient antariksa
+        vec3 nightAmbient = vec3(0.006, 0.010, 0.018);
+        vec3 cityLights = nightLights.rgb * (1.0 - dayFactor) * 2.4;
         vec3 nightHemisphere = cityLights + nightAmbient;
         
-        // Sisi siang: Cahaya matahari alami
+        // Sisi siang: Cahaya matahari natural seimbang
         float diffuse = max(sunDot, 0.0);
         vec3 dayHemisphere = dayColor.rgb * (diffuse * 0.94 + 0.06);
         
-        // Pantulan kilau matahari pada permukaan laut (specular glint)
+        // Pantulan kilau matahari pada laut (Sun glint halus, tidak silau berlebih)
         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
         vec3 halfVec = normalize(sunDir + viewDir);
-        float specIntensity = pow(max(dot(normal, halfVec), 0.0), 32.0) * specValue.r * 1.6;
-        vec3 sunGlint = vec3(1.0, 0.97, 0.90) * specIntensity * dayFactor;
+        float isWater = waterMask.r;
+        float specIntensity = pow(max(dot(normal, halfVec), 0.0), 64.0) * isWater * 0.55;
+        vec3 sunGlint = vec3(1.0, 0.96, 0.88) * specIntensity * dayFactor;
         
-        // Gabungan tekstur permukaan
+        // Permukaan dasar bumi
         vec3 surfaceColor = mix(nightHemisphere, dayHemisphere, dayFactor) + sunGlint;
         
-        // Efek hamburan atmosfer Rayleigh biru tipis di bibir horizon
+        // Hamburan atmosfer Rayleigh tipis di horizon siang hari
         float rim = 1.0 - max(dot(viewDir, normal), 0.0);
-        float atmosphereGlow = pow(rim, 3.4) * max(sunDot * 0.5 + 0.5, 0.15);
-        vec3 atmosphereColor = vec3(0.22, 0.58, 1.0) * atmosphereGlow;
+        float atmosphereIntensity = pow(rim, 3.2);
+        vec3 dayAtmosphere = vec3(0.24, 0.62, 1.0) * atmosphereIntensity * max(sunDot * 0.6 + 0.4, 0.0);
         
-        gl_FragColor = vec4(surfaceColor + atmosphereColor, 1.0);
+        gl_FragColor = vec4(surfaceColor + dayAtmosphere, 1.0);
       }
     `
-
-    const initialSolar = calculateSolarPosition(engineRef.current.currentDate)
 
     const earthMaterial = new THREE.ShaderMaterial({
       vertexShader: earthVertexShader,
@@ -269,7 +287,7 @@ export default function Earth3D() {
       uniforms: {
         dayMap: { value: dayTexture },
         nightMap: { value: nightTexture },
-        specularMap: { value: specularTexture },
+        waterMap: { value: waterTexture },
         sunPosition: { value: new THREE.Vector3(initialSolar.vector.x, initialSolar.vector.y, initialSolar.vector.z) },
       },
     })
@@ -279,8 +297,11 @@ export default function Earth3D() {
     engineRef.current.earthMesh = earthMesh
     engineRef.current.earthMaterial = earthMaterial
 
-    // 7. Lapisan Awan
-    const cloudsGeometry = new THREE.SphereGeometry(earthRadius * 1.014, 64, 64)
+    // ==========================================
+    // 7. LAPISAN AWAN ULTRA HD 4K (HALUS & TRANSPARAN)
+    // ==========================================
+    const cloudsGeometry = new THREE.SphereGeometry(earthRadius * 1.006, 96, 96)
+
     const cloudsVertexShader = `
       varying vec2 vUv;
       varying vec3 vNormal;
@@ -294,6 +315,7 @@ export default function Earth3D() {
         gl_Position = projectionMatrix * viewMatrix * worldPos;
       }
     `
+
     const cloudsFragmentShader = `
       uniform sampler2D cloudsMap;
       uniform vec3 sunPosition;
@@ -307,16 +329,27 @@ export default function Earth3D() {
         vec3 sunDir = normalize(sunPosition - vWorldPosition);
         float sunDot = dot(normal, sunDir);
         
+        // Sampel awan 32-bit ARGB halus
         vec4 cloudSample = texture2D(cloudsMap, vUv);
-        float cloudAlpha = cloudSample.r * 0.72;
+        float cloudAlpha = cloudSample.a;
         
-        // Awan terang di siang hari, bayangan halus di malam hari
-        float dayFactor = smoothstep(-0.1, 0.15, sunDot);
-        vec3 cloudColor = mix(vec3(0.015, 0.02, 0.035), vec3(1.0, 1.0, 1.0), dayFactor);
+        if (cloudAlpha < 0.01) {
+          discard;
+        }
         
-        gl_FragColor = vec4(cloudColor, cloudAlpha);
+        // Pencahayaan awan siang vs malam
+        float daylight = smoothstep(-0.06, 0.12, sunDot);
+        vec3 dayCloud = vec3(1.0, 1.0, 1.0);
+        vec3 nightCloud = vec3(0.012, 0.016, 0.028);
+        vec3 cloudColor = mix(nightCloud, dayCloud, daylight);
+        
+        // Alpha halus tembus pandang alami
+        float finalAlpha = cloudAlpha * 0.76;
+        
+        gl_FragColor = vec4(cloudColor, finalAlpha);
       }
     `
+
     const cloudsMaterial = new THREE.ShaderMaterial({
       vertexShader: cloudsVertexShader,
       fragmentShader: cloudsFragmentShader,
@@ -327,12 +360,70 @@ export default function Earth3D() {
       transparent: true,
       depthWrite: false,
     })
+
     const cloudsMesh = new THREE.Mesh(cloudsGeometry, cloudsMaterial)
     scene.add(cloudsMesh)
     engineRef.current.cloudsMesh = cloudsMesh
     engineRef.current.cloudsMaterial = cloudsMaterial
 
-    // 8. Model Bulan HD dengan Tekstur Kawah Nyata
+    // ==========================================
+    // 8. ATMOSFER GLOW CIRI KHAS GOOGLE EARTH (HALO BIRU)
+    // ==========================================
+    const atmosphereVertexShader = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `
+
+    const atmosphereFragmentShader = `
+      varying vec3 vNormal;
+      varying vec3 vWorldPosition;
+      uniform vec3 sunPosition;
+
+      void main() {
+        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+        vec3 sunDir = normalize(sunPosition - vWorldPosition);
+        vec3 normal = normalize(vNormal);
+        
+        // Pendaran cahaya atmosfer di sekeliling bola bumi
+        float intensity = pow(0.68 - dot(normal, viewDir), 2.8);
+        
+        // Lebih menyala di sisi yang terkena matahari
+        float daylightFactor = smoothstep(-0.2, 0.35, dot(normal, sunDir));
+        vec3 skyColor = mix(vec3(0.04, 0.14, 0.32), vec3(0.32, 0.70, 1.0), daylightFactor);
+        
+        gl_FragColor = vec4(skyColor, intensity * (daylightFactor * 0.75 + 0.15));
+      }
+    `
+
+    const atmosphereMaterial = new THREE.ShaderMaterial({
+      vertexShader: atmosphereVertexShader,
+      fragmentShader: atmosphereFragmentShader,
+      uniforms: {
+        sunPosition: { value: new THREE.Vector3(initialSolar.vector.x, initialSolar.vector.y, initialSolar.vector.z) },
+      },
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+    })
+
+    const atmosphereMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(earthRadius * 1.028, 96, 96),
+      atmosphereMaterial
+    )
+    scene.add(atmosphereMesh)
+    engineRef.current.atmosphereMesh = atmosphereMesh
+    engineRef.current.atmosphereMaterial = atmosphereMaterial
+
+    // ==========================================
+    // 9. MODEL BULAN HD DENGAN TEKSTUR KAWAH
+    // ==========================================
     const moonRadius = 0.49
     const moonGeometry = new THREE.SphereGeometry(moonRadius, 48, 48)
     const moonMaterial = new THREE.MeshStandardMaterial({
@@ -348,11 +439,11 @@ export default function Earth3D() {
     scene.add(moonMesh)
     engineRef.current.moonMesh = moonMesh
 
-    // Garis lintasan orbit Bulan tipis (visualizer)
+    // Garis lintasan orbit Bulan halus
     const moonOrbitGeo = new THREE.BufferGeometry()
     const orbitPoints = []
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2
+    for (let i = 0; i <= 96; i++) {
+      const angle = (i / 96) * Math.PI * 2
       const ox = 9.2 * Math.cos(angle)
       const oy = 9.2 * Math.sin(angle) * Math.sin(5.14 * (Math.PI / 180))
       const oz = 9.2 * Math.sin(angle) * Math.cos(5.14 * (Math.PI / 180))
@@ -361,50 +452,50 @@ export default function Earth3D() {
     moonOrbitGeo.setFromPoints(orbitPoints)
     const moonOrbitLine = new THREE.Line(
       moonOrbitGeo,
-      new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.35 })
+      new THREE.LineBasicMaterial({ color: 0x243248, transparent: true, opacity: 0.4 })
     )
     scene.add(moonOrbitLine)
 
-    // 9. Model Matahari di Posisi Sebenarnya + Cahaya Sinar
+    // ==========================================
+    // 10. MATAHARI SEBENARNYA & CAHAYA DIRECT
+    // ==========================================
     const sunGroup = new THREE.Group()
     sunGroup.position.set(initialSolar.vector.x, initialSolar.vector.y, initialSolar.vector.z)
 
-    // Bola inti matahari
     const sunCoreMesh = new THREE.Mesh(
       new THREE.SphereGeometry(1.9, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0xfffdf0 })
+      new THREE.MeshBasicMaterial({ color: 0xfffef4 })
     )
     sunGroup.add(sunCoreMesh)
 
-    // Korona cahaya matahari berpijar
+    // Korona matahari berpijar
     const sunCoronaTexture = createSunCoronaTexture()
-    const sunCoronaMaterial = new THREE.SpriteMaterial({
-      map: sunCoronaTexture,
-      color: 0xffffff,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-    const sunCoronaSprite = new THREE.Sprite(sunCoronaMaterial)
+    const sunCoronaSprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: sunCoronaTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    )
     sunCoronaSprite.scale.set(13, 13, 1)
     sunGroup.add(sunCoronaSprite)
-
     scene.add(sunGroup)
     engineRef.current.sunGroup = sunGroup
 
-    // Directional Sunlight menuju pusat Bumi (0, 0, 0)
-    const sunLight = new THREE.DirectionalLight(0xfff8ee, 2.7)
+    // Directional Sunlight menuju pusat Bumi
+    const sunLight = new THREE.DirectionalLight(0xfff9ef, 2.7)
     sunLight.position.set(initialSolar.vector.x, initialSolar.vector.y, initialSolar.vector.z)
     sunLight.target.position.set(0, 0, 0)
     scene.add(sunLight)
     scene.add(sunLight.target)
     engineRef.current.sunLight = sunLight
 
-    // Cahaya latar angkasa agar sisi malam tidak hampa total
-    const ambientLight = new THREE.AmbientLight(0x0a101d, 0.25)
+    // Ambient light angkasa
+    const ambientLight = new THREE.AmbientLight(0x0a101d, 0.22)
     scene.add(ambientLight)
 
-    // 10. Bintang Latar Belakang (Starfield)
+    // 11. Bintang Latar Belakang (Starfield)
     const starCount = 3000
     const starGeo = new THREE.BufferGeometry()
     const starPos = new Float32Array(starCount * 3)
@@ -423,12 +514,12 @@ export default function Earth3D() {
       color: 0xffffff,
       size: 0.6,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.75,
     })
     scene.add(new THREE.Points(starGeo, starMat))
 
     // ==========================================
-    // 11. ANIMATION & RENDER LOOP
+    // 12. ANIMATION & RENDER LOOP
     // ==========================================
     let animId
     const clock = new THREE.Clock()
@@ -438,34 +529,35 @@ export default function Earth3D() {
       const delta = clock.getDelta()
       const eng = engineRef.current
 
-      // Update posisi astronomi Matahari dan Bulan
       const solar = calculateSolarPosition(eng.currentDate)
       const moon = calculateMoonPosition(eng.currentDate)
 
-      // Perbarui posisi Matahari di ruang 3D
+      // Perbarui posisi Matahari
       if (eng.sunGroup && eng.sunLight) {
         eng.sunGroup.position.set(solar.vector.x, solar.vector.y, solar.vector.z)
         eng.sunLight.position.set(solar.vector.x, solar.vector.y, solar.vector.z)
       }
 
-      // Perbarui posisi Matahari ke dalam uniform shader Bumi & Awan
+      // Perbarui uniform shader
       if (eng.earthMaterial) {
         eng.earthMaterial.uniforms.sunPosition.value.set(solar.vector.x, solar.vector.y, solar.vector.z)
       }
       if (eng.cloudsMaterial) {
         eng.cloudsMaterial.uniforms.sunPosition.value.set(solar.vector.x, solar.vector.y, solar.vector.z)
       }
+      if (eng.atmosphereMaterial) {
+        eng.atmosphereMaterial.uniforms.sunPosition.value.set(solar.vector.x, solar.vector.y, solar.vector.z)
+      }
 
-      // Perbarui posisi Bulan di orbitnya
+      // Perbarui posisi Bulan
       if (eng.moonMesh) {
         eng.moonMesh.position.set(moon.vector.x, moon.vector.y, moon.vector.z)
-        // Bulan menghadap ke arah pusat Bumi (terkunci pasang surut)
         eng.moonMesh.lookAt(0, 0, 0)
       }
 
-      // Rotasi awan sedikit lebih dinamis untuk efek atmosfer hidup
+      // Pergerakan awan dinamis sangat halus (tanpa tersendat)
       if (eng.cloudsMesh) {
-        eng.cloudsMesh.rotation.y += delta * 0.008
+        eng.cloudsMesh.rotation.y += delta * 0.006
       }
 
       // Transisi kamera halus saat berganti fokus
@@ -483,7 +575,7 @@ export default function Earth3D() {
 
     animate()
 
-    // 12. Responsive Resize
+    // 13. Responsive Resize
     const handleResize = () => {
       if (!mount) return
       const w = mount.clientWidth
@@ -504,6 +596,8 @@ export default function Earth3D() {
       earthMaterial.dispose()
       cloudsGeometry.dispose()
       cloudsMaterial.dispose()
+      atmosphereMesh.geometry.dispose()
+      atmosphereMaterial.dispose()
       moonGeometry.dispose()
       moonMaterial.dispose()
       moonOrbitGeo.dispose()
@@ -515,7 +609,6 @@ export default function Earth3D() {
     }
   }, [])
 
-  // Format Waktu Indonesia Barat (WIB) dan UTC
   const formatTimeIndo = (date) => {
     return date.toLocaleTimeString('id-ID', {
       timeZone: 'Asia/Jakarta',
@@ -547,35 +640,33 @@ export default function Earth3D() {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#010307] font-sans select-none text-neutral-200">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#010204] font-sans select-none text-neutral-200">
       {/* Three.js Canvas Container */}
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Indikator Memuat Awal */}
       {isLoading && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#010307] text-neutral-300">
-          <div className="w-9 h-9 border-2 border-neutral-700 border-t-white rounded-full animate-spin mb-3" />
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#010204] text-neutral-300">
+          <div className="w-8 h-8 border-2 border-neutral-700 border-t-white rounded-full animate-spin mb-3" />
           <p className="font-mono-tech text-xs tracking-wider uppercase text-neutral-400">
-            Menginisialisasi Model Astronomi Tiga Dimensi...
+            Memuat Citra Satelit Bumi & Awan 4K...
           </p>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* PANEL ATAS KIRI: TELEMETRI WAKTU NYATA & KOORDINAT SURYA */}
+      {/* PANEL ATAS KIRI: TELEMETRI OBSERVATORIUM                */}
       {/* ======================================================== */}
       <div className="absolute top-5 left-5 z-20 flex flex-col gap-2 pointer-events-none">
-        <div className="bg-[#090D16]/85 backdrop-blur-md border border-neutral-800/80 px-4 py-3 rounded-lg shadow-xl pointer-events-auto">
-          {/* Header Status */}
+        <div className="bg-[#080C14]/85 backdrop-blur-md border border-neutral-800/80 px-4 py-3 rounded-lg shadow-xl pointer-events-auto">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-neutral-800">
             <span className={`w-2 h-2 rounded-full ${isRealtime ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className="font-mono-tech text-[11px] font-bold tracking-wider text-neutral-200 uppercase">
-              {isRealtime ? 'Sistem Siang & Malam Waktu Nyata' : 'Mode Simulasi Waktu Manual'}
+              {isRealtime ? 'Sinkronisasi Waktu Nyata' : 'Mode Simulasi Waktu'}
             </span>
           </div>
 
-          {/* Jam WIB & UTC */}
-          <div className="grid grid-cols-2 gap-4 mb-2.5">
+          <div className="grid grid-cols-2 gap-4 mb-2">
             <div>
               <p className="font-mono-tech text-[10px] text-neutral-400 uppercase tracking-wide">Waktu Indonesia (WIB)</p>
               <p className="font-mono-tech text-lg font-bold text-white tracking-tight">
@@ -594,7 +685,6 @@ export default function Earth3D() {
             {formatDateIndo(currentDate)}
           </p>
 
-          {/* Posisi Zenit Matahari */}
           <div className="pt-2 border-t border-neutral-800/80 space-y-1 text-xs font-mono-tech">
             <div className="flex items-center justify-between gap-4">
               <span className="text-neutral-400">Titik Sub-Solar (Zenit):</span>
@@ -614,7 +704,7 @@ export default function Earth3D() {
       {/* PANEL ATAS KANAN: KONTROL FOKUS KAMERA & VISUALISASI     */}
       {/* ======================================================== */}
       <div className="absolute top-5 right-5 z-20 flex flex-col items-end gap-2.5 pointer-events-auto">
-        <div className="bg-[#090D16]/85 backdrop-blur-md border border-neutral-800/80 p-3 rounded-lg shadow-xl flex flex-col gap-2 min-w-[210px]">
+        <div className="bg-[#080C14]/85 backdrop-blur-md border border-neutral-800/80 p-3 rounded-lg shadow-xl flex flex-col gap-2 min-w-[210px]">
           <span className="font-mono-tech text-[10px] text-neutral-400 uppercase tracking-wider pb-1.5 border-b border-neutral-800">
             Arahkan Kamera
           </span>
@@ -657,21 +747,20 @@ export default function Earth3D() {
             </button>
           </div>
 
-          {/* Toggle Awan */}
           <button
             onClick={() => setShowClouds(!showClouds)}
             className="flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono-tech bg-neutral-900 hover:bg-neutral-800 text-neutral-300 transition cursor-pointer border border-neutral-800"
           >
             <span className="flex items-center gap-1.5">
               <Layers className="w-3 h-3 text-neutral-400" />
-              Lapisan Awan
+              Lapisan Awan 4K
             </span>
             <span className="font-bold text-[10px] text-neutral-400">{showClouds ? 'ON' : 'OFF'}</span>
           </button>
         </div>
 
         {/* Info Fase Bulan */}
-        <div className="bg-[#090D16]/85 backdrop-blur-md border border-neutral-800/80 px-3.5 py-2.5 rounded-lg shadow-xl min-w-[210px]">
+        <div className="bg-[#080C14]/85 backdrop-blur-md border border-neutral-800/80 px-3.5 py-2.5 rounded-lg shadow-xl min-w-[210px]">
           <div className="flex items-center gap-2 mb-1">
             <Moon className="w-3.5 h-3.5 text-neutral-300" />
             <p className="font-mono-tech text-[10px] text-neutral-400 uppercase tracking-wider">Fase Bulan Astronomi</p>
@@ -689,7 +778,7 @@ export default function Earth3D() {
       {/* PANEL BAWAH: SCRUBBER WAKTU SIANG/MALAM (24 JAM)         */}
       {/* ======================================================== */}
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-2xl pointer-events-auto">
-        <div className="bg-[#090D16]/90 backdrop-blur-md border border-neutral-800/80 px-4 py-3 rounded-lg shadow-2xl flex flex-col gap-2">
+        <div className="bg-[#080C14]/90 backdrop-blur-md border border-neutral-800/80 px-4 py-3 rounded-lg shadow-2xl flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs font-mono-tech">
             <div className="flex items-center gap-2 text-neutral-300">
               <Sliders className="w-3.5 h-3.5 text-neutral-400" />
@@ -710,7 +799,6 @@ export default function Earth3D() {
             )}
           </div>
 
-          {/* Range Slider 0.0 - 23.99 */}
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-mono-tech text-neutral-500">00:00</span>
             <input
