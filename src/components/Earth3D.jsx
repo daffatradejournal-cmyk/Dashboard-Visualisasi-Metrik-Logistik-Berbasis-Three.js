@@ -659,7 +659,20 @@ export default function Earth3D() {
       {/* ======================================================== */}
       <div className="absolute top-5 left-5 z-20 flex flex-col gap-2 pointer-events-none">
         <div className="bg-[#080C14]/85 backdrop-blur-md border border-neutral-800/80 px-4 py-3 rounded-lg shadow-xl pointer-events-auto">
-          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-neutral-800">
+          {/* Creator Brand Header */}
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-800/80">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              <span className="font-mono-tech text-xs font-bold text-white tracking-wide">
+                Muhammad Daffa.Dev
+              </span>
+            </div>
+            <span className="font-mono-tech text-[9px] font-bold text-neutral-300 uppercase tracking-widest bg-neutral-900/90 px-1.5 py-0.5 rounded border border-neutral-800">
+              DEVELOPER
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-neutral-800/60">
             <span className={`w-2 h-2 rounded-full ${isRealtime ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className="font-mono-tech text-[11px] font-bold tracking-wider text-neutral-200 uppercase">
               {isRealtime ? 'Sinkronisasi Waktu Nyata' : 'Mode Simulasi Waktu'}
@@ -821,6 +834,14 @@ export default function Earth3D() {
             <span>Tarik slider untuk melihat pergeseran matahari & lampu kota di malam hari</span>
             <span>Navigasi: Drag Kiri (Putar) | Drag Kanan (Geser) | Scroll (Zoom)</span>
           </div>
+        </div>
+      </div>
+
+      {/* Signature Watermark Creator */}
+      <div className="absolute bottom-5 left-5 z-20 pointer-events-none hidden lg:block">
+        <div className="bg-[#080C14]/80 backdrop-blur-md border border-neutral-800/80 px-3 py-1.5 rounded-lg text-xs font-mono-tech flex items-center gap-2 shadow-lg">
+          <span className="text-neutral-500 text-[10px] uppercase tracking-wider">Karya:</span>
+          <span className="text-white font-bold tracking-tight">Muhammad Daffa.Dev</span>
         </div>
       </div>
     </div>

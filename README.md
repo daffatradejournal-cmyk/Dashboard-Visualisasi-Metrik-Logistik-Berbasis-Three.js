@@ -1,20 +1,21 @@
-# Dashboard-Visualisasi-Metrik-Logistik-Berbasis-Three.js
+# Simulasi Bumi 3D Waktu Nyata (Real-Time 3D Earth)
 
-Aplikasi dashboard interaktif untuk memantau pergerakan armada pengiriman barang secara langsung (real-time). Menggantikan bagan statis dengan peta 3D interaktif yang ringan, lancar, dan mudah dipahami oleh tim operasional.
+> **Karya / Developed by: Muhammad Daffa.Dev**
 
-## 🚀 Sorotan Cara Kerja Sistem
-Menggunakan teknologi grafika 3D Three.js yang mampu menampilkan ribuan titik armada logistik secara mulus tanpa membuat komputer atau ponsel pengguna menjadi lambat. Data posisi rute diperbarui secara langsung melalui koneksi internet berkecepatan tinggi.
+Aplikasi visualisasi Bumi 3D interaktif fotorealistik berbasis Three.js dengan sinkronisasi waktu nyata (siklus siang & malam astronomis), model Bulan HD bertekstur kawah, posisi Matahari akurat di koordinat angkasa, lapisan awan 4K lembut, serta halo atmosfer khas Google Earth (*Rayleigh Scattering*).
 
-- **Peran Utama**: Frontend & 3D Graphics Developer
-- **Performa Sistem**: Sangat Ringan & Lancar (60 FPS Stabil)
-- **Hasil Akhir**: Tampilan peta 3D interaktif hemat memori di layar komputer maupun ponsel
+## ✨ Fitur Utama
+- **Pengembang**: Muhammad Daffa.Dev
+- **Sinkronisasi Siang & Malam Waktu Nyata**: Menghitung posisi Matahari terhadap Bumi per detik berdasarkan UTC dan Waktu Indonesia Barat (WIB).
+- **Lampu Kota di Sisi Malam**: Lampu-lampu kota menyala secara realistis pada belahan bumi yang mengalami malam hari.
+- **Model Bulan HD 3D**: Mengorbit bumi dengan fase bulan fisik (sabit, perbani, purnama) yang otomatis akurat sesuai posisi matahari.
+- **Citra Satelit 4K NASA Blue Marble**: Permukaan benua, masker air laut (*specular glint* natural), dan lapisan awan 4K 32-bit ARGB halus tanpa pixelasi.
+- **Antarmuka Standar Observatorium**: Telemetri koordinat sub-solar, fokus kamera 1-klik (Bumi, Bulan, Matahari), dan kontrol simulasi siklus 24 jam berbahasa Indonesia.
 
 ## 🛠️ Tech Stack
-- **Three.js** & **@react-three/fiber** / **@react-three/drei**
-- **WebGL 3D** (InstancedMesh untuk optimasi ribuan armada dalam 1 draw call)
+- **Three.js** (WebGL 3D, Custom Shaders, OrbitControls)
 - **React** & **Vite**
 - **Tailwind CSS v4**
-- **Framer Motion**
 - **Lucide Icons**
 
 ## 💻 Cara Menjalankan Proyek
